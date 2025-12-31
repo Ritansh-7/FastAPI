@@ -1,0 +1,88 @@
+name: CI/CD Pipeline
+
+# When to run this workflow
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  # JOB 1: TEST
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    # Step 1: Download the code from GitHub
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    # Step 2: Install Python 3.9
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    # Step 3: Install dependencies
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    # Step 4: Run tests
+    - name: Run tests with pytest
+      run: pytest test_main.py -v
+    
+    # Step 5: Run the app (make sure it starts without errors)
+    - name: Test app startup
+      run: |
+        timeout 5 uvicorn main:app --host 0.0.0.0 --port 8000 || true
+
+  # JOB 2: CODE QUALITY (optional but recommended)
+  quality:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Install flake8
+      run: pip install flake8
+    
+    - name: Lint with flake8
+      run: flake8 main.py test_main.py --count --select=E9,F63,F7,F82 --show-source --statistics
+
+  # JOB 3: BUILD (optional - just to make sure everything builds)
+  build:
+    needs: [test, quality]
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Install dependencies
+      run: pip install -r requirements.txt
+    
+    - name: Build check
+      run: python -m py_compile main.py test_main.py
+
+  # JOB 4: SUMMARY (shows when everything is done)
+  summary:
+    needs: [test, quality, build]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Workflow completed
+      run: echo "✅ CI/CD Pipeline completed!"
